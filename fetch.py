@@ -53,9 +53,14 @@ CHANNELS: dict[str, str] = {
 
 # 日期格式候选。BBC 页面格式未知，逐个尝试；命中不了的会记进日志供排查。
 DATE_FORMATS = (
-    "%d %B %Y", "%d %b %Y", "%d/%m/%Y", "%Y-%m-%d",
-    "%B %d, %Y", "%b %d, %Y", "%d %B, %Y", "%d %b, %Y",
+    "%d %b %Y", "%d %B %Y", "%d/%m/%Y", "%Y-%m-%d",
+    "%b %d, %Y", "%B %d, %Y", "%d %b, %Y", "%d %B, %Y",
 )
+
+# BBC 的 .details h3 内容形如 "Episode 260907/ 07 Sep 2026"——前半的 260907
+# 是剧集编号里的日期，整串无法直接 strptime。先正则抠出后半再解析。
+# （RSSHub 正是在这里出错，把 260907 当成了日期，生成 260907 年的 pubDate。）
+DATE_IN_TEXT = re.compile(r"(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})")
 
 log = logging.getLogger("myrss")
 
@@ -63,13 +68,21 @@ log = logging.getLogger("myrss")
 def parse_date(text: str) -> datetime:
     """解析 BBC 的日期文本；失败则退回当前时间，并把原文记进日志。"""
     cleaned = re.sub(r"\s+", " ", (text or "").strip())
-    for fmt in DATE_FORMATS:
-        try:
-            return datetime.strptime(cleaned, fmt).replace(
-                hour=12, tzinfo=timezone.utc
-            )
-        except ValueError:
-            continue
+
+    candidates: list[str] = []
+    if m := DATE_IN_TEXT.search(cleaned):
+        candidates.append(f"{m.group(1)} {m.group(2)} {m.group(3)}")
+    candidates.append(cleaned)
+
+    for candidate in candidates:
+        for fmt in DATE_FORMATS:
+            try:
+                return datetime.strptime(candidate, fmt).replace(
+                    hour=12, tzinfo=timezone.utc
+                )
+            except ValueError:
+                continue
+
     log.warning("日期解析失败，回退为当前时间: %r", cleaned)
     return datetime.now(timezone.utc)
 
