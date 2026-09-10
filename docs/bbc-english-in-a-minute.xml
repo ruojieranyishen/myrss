@@ -1,11 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
   <channel>
     <title>BBC英语学习-一分钟英语</title>
     <link>https://www.bbc.co.uk/learningenglish/chinese/features/english-in-a-minute</link>
     <description>BBC Learning English 中文版「一分钟英语」— 由 myrss 每日镜像</description>
     <language>zh-cn</language>
-    <lastBuildDate>Thu, 10 Sep 2026 11:38:47 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 10 Sep 2026 15:09:57 +0000</lastBuildDate>
+    <atom:link rel="self" type="application/rss+xml" href="https://raw.githubusercontent.com/ruojieranyishen/myrss/main/docs/bbc-english-in-a-minute.xml" />
+    <item>
+      <title>一词一讲：lift</title>
+      <link>https://www.bbc.co.uk/learningenglish/chinese/features/english-in-a-minute/ep-260911</link>
+      <guid isPermaLink="true">https://www.bbc.co.uk/learningenglish/chinese/features/english-in-a-minute/ep-260911</guid>
+      <pubDate>Fri, 11 Sep 2026 12:00:00 +0000</pubDate>
+      <description>&lt;div class="text" dir="ltr"&gt;&lt;h3&gt;内容简介&lt;/h3&gt;
+&lt;p&gt;单词 “lift” 作动词时有 “举起，抬起” 的意思。不过，它还可以作名词使用。比如，“give someone a lift” 既可以表示 “开车顺路捎某人一程”，也可以用来表示 “鼓舞某人，让某人心情好起来”。除此之外，“lift” 还有哪些含义呢？看视频，跟主持人 Georgie 一起学习单词 “lift” 的四个常见含义和用法。&lt;/p&gt;
+&lt;h3&gt;用法总结：&lt;/h3&gt;
+&lt;p&gt;1. lift（动词）：举起，抬起&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;He &lt;strong&gt;lifted&lt;/strong&gt; the boxes so he could move them inside.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;ul&gt;
+&lt;li&gt;She likes to &lt;strong&gt;lift&lt;/strong&gt; weights to get stronger.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;2. lift（名词，英式英语）：电梯，直梯&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;I'm too tired to take the stairs. Shall we take the &lt;strong&gt;lift&lt;/strong&gt;?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;ul&gt;
+&lt;li&gt;The apartment is on the 8th floor, but luckily the building has a &lt;strong&gt;lift&lt;/strong&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;3. lift（名词）：鼓舞，振奋&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;I was feeling a bit sad, but that song really gave me a &lt;strong&gt;lift&lt;/strong&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;ul&gt;
+&lt;li&gt;When I feel low, I find that spending time in nature gives me a &lt;strong&gt;lift&lt;/strong&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;4. lift（名词）：便车，顺路捎一程&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Could you give me a &lt;strong&gt;lift&lt;/strong&gt; to the station? It's too far to walk.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;ul&gt;
+&lt;li&gt;There were no school buses when I was a child, so my dad always gave me a &lt;strong&gt;lift&lt;/strong&gt;.&lt;/li&gt;
+&lt;/ul&gt;&lt;/div&gt;</description>
+    </item>
     <item>
       <title>一词一讲：label</title>
       <link>https://www.bbc.co.uk/learningenglish/chinese/features/english-in-a-minute/ep-260904</link>
@@ -381,43 +419,6 @@
 &lt;/ul&gt;
 &lt;ul&gt;
 &lt;li&gt;Are you going to the &lt;strong&gt;post&lt;/strong&gt;-work party later? We've booked a karaoke room for everyone who wants to join.&lt;/li&gt;
-&lt;/ul&gt;&lt;/div&gt;</description>
-    </item>
-    <item>
-      <title>一词一讲：service</title>
-      <link>https://www.bbc.co.uk/learningenglish/chinese/features/english-in-a-minute/ep-260626</link>
-      <guid isPermaLink="true">https://www.bbc.co.uk/learningenglish/chinese/features/english-in-a-minute/ep-260626</guid>
-      <pubDate>Fri, 26 Jun 2026 12:00:00 +0000</pubDate>
-      <description>&lt;div class="text" dir="ltr"&gt;&lt;h3&gt;内容简介&lt;/h3&gt;
-&lt;p&gt;单词 “service” 常见的意思是 “服务”。不过，你知道它还有哪些常用含义吗？在网球、排球等体育运动中，“service” 可以表示 “发球” 或 “发球动作”；而在乘坐交通工具时，“service” 可以指代 “（公共交通的）班次”。看视频，跟主持人 Phil 一起来学习单词 “service” 的四种常见用法。&lt;/p&gt;
-&lt;h3&gt;用法总结&lt;/h3&gt;
-&lt;p&gt;1. service (名词）：（公共交通的）班次、车次&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;Sorry, can you tell me which platform I need for the 9.15 &lt;strong&gt;service&lt;/strong&gt;?&lt;/li&gt;
-&lt;/ul&gt;
-&lt;ul&gt;
-&lt;li&gt;You'd better be going, or you will miss the last &lt;strong&gt;service&lt;/strong&gt; home.&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;2. service（名词）：（车辆、设备的）定期检修，保养&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;OK, so you're bringing your car in for its annual &lt;strong&gt;service&lt;/strong&gt;? Great, I'll look at it now.&lt;/li&gt;
-&lt;/ul&gt;
-&lt;ul&gt;
-&lt;li&gt;Could you please book a &lt;strong&gt;service&lt;/strong&gt; for our boiler? It's not heating the water.&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;3. service（名词）：（在网球等体育运动中）发球&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;She's been practising her &lt;strong&gt;service&lt;/strong&gt;, and now she's one of the best.&lt;/li&gt;
-&lt;/ul&gt;
-&lt;ul&gt;
-&lt;li&gt;He has such a brilliant &lt;strong&gt;service&lt;/strong&gt; game, I'm confident that he'll win the tournament.&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;4. service（名词）：（高速路旁的）服务区，休息站&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;I'm starving. How long until we get to the &lt;strong&gt;services&lt;/strong&gt;?&lt;/li&gt;
-&lt;/ul&gt;
-&lt;ul&gt;
-&lt;li&gt;We should stop at the next &lt;strong&gt;service&lt;/strong&gt;. We're getting low on petrol. &lt;/li&gt;
 &lt;/ul&gt;&lt;/div&gt;</description>
     </item>
   </channel>

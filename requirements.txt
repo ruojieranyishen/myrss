@@ -1,0 +1,4 @@
+# 抓取依赖。上界留出余量但不跨大版本——BS4 的 soupsieve 选择器语义
+# 在 4.x 内稳定，5.x 未必（历史上 cheerio 与 soupsieve 的差异就踩过一次）。
+requests>=2.31,<3
+beautifulsoup4>=4.12,<5

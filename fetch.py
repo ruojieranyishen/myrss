@@ -20,6 +20,7 @@ import html
 import logging
 import re
 import sys
+import threading
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -34,6 +35,12 @@ from urllib3.util.retry import Retry
 ROOT = "https://www.bbc.co.uk"
 OUT_DIR = Path(__file__).resolve().parent / "docs"
 TIMEOUT = 30
+
+# feed 自身的公开地址。写进 <atom:link rel="self">，客户端导入时才能自动补全 url。
+RAW_BASE = "https://raw.githubusercontent.com/ruojieranyishen/myrss/main/docs"
+ATOM_NS = "http://www.w3.org/2005/Atom"
+ET.register_namespace("atom", ATOM_NS)
+
 UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/131.0 Safari/537.36"
@@ -82,6 +89,31 @@ DATE_IN_TEXT = re.compile(r"(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})")
 
 log = logging.getLogger("myrss")
 
+# 每个线程一份 session。requests.Session 的 cookie jar 与连接池不是线程安全的，
+# 而详情页是并发抓的——共用一个 session 会在 urllib3 连接池里竞争。
+_thread_local = threading.local()
+
+
+def get_session() -> requests.Session:
+    """取当前线程的 session，没有则新建（含重试策略）。"""
+    session = getattr(_thread_local, "session", None)
+    if session is None:
+        session = requests.Session()
+        # BBC 偶发瞬时 404/5xx（同一 URL 前后两次请求结果可能不同），重试几次再放弃
+        session.mount(
+            "https://",
+            HTTPAdapter(
+                max_retries=Retry(
+                    total=3,
+                    backoff_factor=1.5,
+                    status_forcelist=[404, 429, 500, 502, 503, 504],
+                    allowed_methods=["GET"],
+                )
+            ),
+        )
+        _thread_local.session = session
+    return session
+
 
 def parse_date(text: str) -> datetime:
     """解析 BBC 的日期文本；失败则退回当前时间，并把原文记进日志。"""
@@ -105,13 +137,18 @@ def parse_date(text: str) -> datetime:
     return datetime.now(timezone.utc)
 
 
+def feed_url(channel: str) -> str:
+    """某个栏目 feed 的公开地址。"""
+    return f"{RAW_BASE}/bbc-{channel}.xml"
+
+
 def absolute(href: str | None) -> str | None:
     if not href:
         return None
     return href if href.startswith("http") else f"{ROOT}{href}"
 
 
-def fetch_detail(session: requests.Session, url: str) -> tuple[str, str | None]:
+def fetch_detail(url: str) -> tuple[str, str | None]:
     """抓文章详情页，返回 (正文 HTML, 音频 URL)。
 
     正文取自 .widget-richtext；音频不在这个容器里——BBC 用单独的
@@ -119,7 +156,7 @@ def fetch_detail(session: requests.Session, url: str) -> tuple[str, str | None]:
     失败不影响条目本身，只是 description/enclosure 为空。
     """
     try:
-        resp = session.get(url, headers=HEADERS, timeout=TIMEOUT)
+        resp = get_session().get(url, headers=HEADERS, timeout=TIMEOUT)
         resp.raise_for_status()
         node = BeautifulSoup(resp.text, "html.parser").select_one(".widget-richtext")
         return (
@@ -131,10 +168,10 @@ def fetch_detail(session: requests.Session, url: str) -> tuple[str, str | None]:
         return "", None
 
 
-def scrape_channel(session: requests.Session, channel: str) -> list[dict]:
+def scrape_channel(channel: str) -> list[dict]:
     """抓一个栏目，返回条目列表。沿用 RSSHub 的选取策略。"""
     page_url = f"{ROOT}/learningenglish/chinese/features/{channel}"
-    resp = session.get(page_url, headers=HEADERS, timeout=TIMEOUT)
+    resp = get_session().get(page_url, headers=HEADERS, timeout=TIMEOUT)
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
 
@@ -177,9 +214,7 @@ def scrape_channel(session: requests.Session, channel: str) -> list[dict]:
     targets = [i for i in items if i.get("link")]
     if targets:
         with ThreadPoolExecutor(max_workers=6) as pool:
-            futures = {
-                pool.submit(fetch_detail, session, i["link"]): i for i in targets
-            }
+            futures = {pool.submit(fetch_detail, i["link"]): i for i in targets}
             for fut in as_completed(futures):
                 futures[fut]["content"], futures[fut]["audio"] = fut.result()
 
@@ -210,6 +245,12 @@ def build_rss(channel: str, label: str, items: list[dict]) -> str:
     ET.SubElement(ch, "lastBuildDate").text = format_datetime(
         datetime.now(timezone.utc)
     )
+    # 客户端靠 atom:link self 识别 feed 自身地址（导入时自动补全 url 字段）
+    ET.SubElement(
+        ch,
+        f"{{{ATOM_NS}}}link",
+        {"rel": "self", "type": "application/rss+xml", "href": feed_url(channel)},
+    )
 
     for it in sorted(items, key=lambda x: x["date"], reverse=True):
         node = ET.SubElement(ch, "item")
@@ -233,6 +274,14 @@ def build_rss(channel: str, label: str, items: list[dict]) -> str:
     )
 
 
+def count_items(path: Path) -> int:
+    """数一个已生成 RSS 里的条目数。文件是自己写的，用 XML 解析比正则稳。"""
+    try:
+        return len(ET.parse(path).getroot().findall("./channel/item"))
+    except (ET.ParseError, OSError):
+        return 0
+
+
 def write_index() -> None:
     """生成浏览页。
 
@@ -242,10 +291,7 @@ def write_index() -> None:
     entries = []
     for path in sorted(OUT_DIR.glob("bbc-*.xml")):
         label = CHANNELS.get(path.stem.removeprefix("bbc-"), path.stem)
-        try:
-            count = len(re.findall(r"<item>", path.read_text(encoding="utf-8")))
-        except OSError:
-            count = 0
+        count = count_items(path)
         entries.append(
             f'      <li><a href="{path.name}">{html.escape(label)}</a> '
             f'<span class="n">{count} 条</span></li>'
@@ -272,6 +318,41 @@ def write_index() -> None:
     )
 
 
+def process_channel(channel: str) -> tuple[str, list[dict]]:
+    """抓一个栏目并落盘，返回 (slug, 条目列表)。失败则抛异常。
+
+    跑在 worker 线程里，所以只做「抓 + 写」；日志留给主线程，
+    免得并发输出把几行状态交错在一起。
+    """
+    label = CHANNELS.get(channel, channel)
+    items = scrape_channel(channel)
+    if not items:
+        raise RuntimeError("页面解析出 0 条，选择器可能已失效")
+    slug = f"bbc-{channel}"
+    (OUT_DIR / f"{slug}.xml").write_text(
+        build_rss(channel, label, items), encoding="utf-8"
+    )
+    return slug, items
+
+
+def report_channel(label: str, items: list[dict]) -> None:
+    """打印单个栏目的抓取结果。"""
+    # 音频覆盖率一并报出来——BBC 改版把播放器挪走后，这里会先掉下来
+    audio = sum(1 for i in items if i.get("audio"))
+    newest = max(i["date"] for i in items)
+    age = (datetime.now(timezone.utc) - newest).days
+    if age > STALE_DAYS:
+        log.warning(
+            "⚠️  %-24s %d 条（音频 %d），但最新一条已是 %d 天前（%s），栏目可能已停更",
+            label, len(items), audio, age, newest.strftime("%Y-%m-%d"),
+        )
+    else:
+        log.info(
+            "✅ %-24s %d 条（音频 %d），最新 %s",
+            label, len(items), audio, newest.strftime("%Y-%m-%d"),
+        )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--channel", action="append", help="只抓指定栏目（可重复）")
@@ -286,48 +367,24 @@ def main() -> int:
     channels = args.channel or list(CHANNELS)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    session = requests.Session()
-    # BBC 偶发瞬时 404/5xx（同一 URL 前后两次请求结果可能不同），重试几次再放弃
-    session.mount(
-        "https://",
-        HTTPAdapter(
-            max_retries=Retry(
-                total=3,
-                backoff_factor=1.5,
-                status_forcelist=[404, 429, 500, 502, 503, 504],
-                allowed_methods=["GET"],
-            )
-        ),
-    )
-    results: list[tuple[str, str, int]] = []
+    results: list[str] = []
     failed: list[str] = []
 
-    for channel in channels:
-        label = CHANNELS.get(channel, channel)
-        try:
-            items = scrape_channel(session, channel)
-            if not items:
-                raise RuntimeError("页面解析出 0 条，选择器可能已失效")
-            slug = f"bbc-{channel}"
-            (OUT_DIR / f"{slug}.xml").write_text(
-                build_rss(channel, label, items), encoding="utf-8"
-            )
-            results.append((slug, f"BBC英语学习-{label}", len(items)))
-            # 音频覆盖率一并报出来——BBC 改版把播放器挪走后，这里会先掉下来
-            audio = sum(1 for i in items if i.get("audio"))
-            newest = max(i["date"] for i in items)
-            age = (datetime.now(timezone.utc) - newest).days
-            if age > STALE_DAYS:
-                log.warning(
-                    "⚠️  %-24s %d 条（音频 %d），但最新一条已是 %d 天前（%s），栏目可能已停更",
-                    label, len(items), audio, age, newest.strftime("%Y-%m-%d"),
-                )
-            else:
-                log.info("✅ %-24s %d 条（音频 %d），最新 %s", label, len(items),
-                         audio, newest.strftime("%Y-%m-%d"))
-        except Exception as exc:  # noqa: BLE001 — 单栏目失败不影响其他栏目
-            failed.append(channel)
-            log.error("❌ %-24s %s", label, exc)
+    # 栏目之间互相独立，并发抓。每个 worker 内部还会再开一个详情页线程池，
+    # 所以 4 个栏目并发时峰值约 4×6=24 个线程——对 BBC 来说仍是礼貌的量级。
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = {pool.submit(process_channel, ch): ch for ch in channels}
+        for fut in as_completed(futures):
+            channel = futures[fut]
+            label = CHANNELS.get(channel, channel)
+            try:
+                slug, items = fut.result()
+            except Exception as exc:  # noqa: BLE001 — 单栏目失败不影响其他栏目
+                failed.append(channel)
+                log.error("❌ %-24s %s", label, exc)
+                continue
+            results.append(slug)
+            report_channel(label, items)
 
     write_index()
 

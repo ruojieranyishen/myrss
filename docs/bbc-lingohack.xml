@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
   <channel>
     <title>BBC英语学习-英语大破解</title>
     <link>https://www.bbc.co.uk/learningenglish/chinese/features/lingohack</link>
     <description>BBC Learning English 中文版「英语大破解」— 由 myrss 每日镜像</description>
     <language>zh-cn</language>
-    <lastBuildDate>Thu, 10 Sep 2026 11:38:59 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 10 Sep 2026 15:09:59 +0000</lastBuildDate>
+    <atom:link rel="self" type="application/rss+xml" href="https://raw.githubusercontent.com/ruojieranyishen/myrss/main/docs/bbc-lingohack.xml" />
     <item>
       <title>How going slow can increase your enjoyment of art 慢下来欣赏艺术，为何能让你获得更多乐趣</title>
       <link>https://www.bbc.co.uk/learningenglish/chinese/features/lingohack/ep-260910</link>

@@ -59,7 +59,7 @@ newsboat 里直接把这行加进 `urls` 文件即可。
 ## 本地运行
 
 ```bash
-pip install requests beautifulsoup4
+pip install -r requirements.txt
 python fetch.py                    # 全部栏目
 python fetch.py --channel lingohack -v   # 单栏目，带调试日志
 ```
