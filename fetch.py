@@ -101,8 +101,10 @@ def scrape_channel(session: requests.Session, channel: str) -> list[dict]:
 
     items: list[dict] = []
 
-    # 头条：页面顶部大图位
-    first = soup.select_one("[data-widget-index=4]")
+    # 头条：页面顶部大图位。
+    # 注意属性值必须加引号——soupsieve 比 cheerio 严格，`[data-widget-index=4]`
+    # 会抛 Malformed attribute selector（数字不是合法 CSS 标识符）。
+    first = soup.select_one('[data-widget-index="4"]')
     if first and first.select_one("h2"):
         date_node = first.select_one(".details h3")
         items.append(
@@ -142,6 +144,15 @@ def scrape_channel(session: requests.Session, channel: str) -> list[dict]:
             }
             for fut in as_completed(futures):
                 futures[fut]["content"] = fut.result()
+
+    if not items:
+        # 选择器失效时给出足够线索，免得只能靠猜
+        log.warning(
+            "解析出 0 条 — 诊断: hero命中=%s, .threecol li=%d 个, 页面标题=%r",
+            first is not None,
+            len(soup.select(".threecol li")),
+            soup.title.get_text(strip=True) if soup.title else None,
+        )
 
     return [i for i in items if i.get("title") and i.get("link")]
 
