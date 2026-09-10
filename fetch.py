@@ -59,7 +59,15 @@ STALE_DAYS = 90
 
 # 文章配套音频。BBC 把 mp3 放在 downloads.bbc.co.uk（Akamai CDN），
 # 与 www.bbc.co.uk 一样在墙内可达，可以直接给客户端当 enclosure。
+# 少数页面给的是 http:// 链接——服务端两种都通，但浏览器会按混合内容拦掉，
+# 所以统一升级成 https（见 pick_mp3）。
 MP3_RE = re.compile(r'https?://downloads\.bbc\.co\.uk/[^\s"\'<>]+\.mp3')
+
+
+def pick_mp3(page: str) -> str | None:
+    """取出文章配套音频，协议统一成 https。"""
+    url = next(iter(MP3_RE.findall(page)), None)
+    return url.replace("http://", "https://", 1) if url else None
 
 # 日期格式候选。BBC 页面格式未知，逐个尝试；命中不了的会记进日志供排查。
 DATE_FORMATS = (
@@ -116,7 +124,7 @@ def fetch_detail(session: requests.Session, url: str) -> tuple[str, str | None]:
         node = BeautifulSoup(resp.text, "html.parser").select_one(".widget-richtext")
         return (
             node.decode_contents() if node else "",
-            next(iter(MP3_RE.findall(resp.text)), None),
+            pick_mp3(resp.text),
         )
     except Exception as exc:  # noqa: BLE001 — 单条失败不该拖垮整个源
         log.warning("详情页抓取失败 %s: %s", url, exc)
