@@ -38,18 +38,22 @@ UA = (
 )
 HEADERS = {"User-Agent": UA, "Accept-Language": "en-GB,en;q=0.9,zh-CN;q=0.8"}
 
-# BBC Learning English 中文版栏目
+# BBC Learning English 中文版栏目。
+# 只保留仍在更新的——以下栏目已停更，故移除（2026-09-10 实测）：
+#   todays-phrase  今日短语  最后更新 2022-12-29
+#   english-at-work 白领英语 最后更新 2019-11-01
+#   phrasal-verbs  短语动词  最后更新 2025-09-30
 CHANNELS: dict[str, str] = {
     "take-away-english": "随身英语",
     "english-in-a-minute": "一分钟英语",
     "authentic-real-english": "地道英语",
-    "todays-phrase": "今日短语",
-    "english-at-work": "白领英语",
     "lingohack": "英语大破解",
-    "phrasal-verbs": "短语动词",
     "q-and-a": "你问我答",
     "media-english": "媒体英语",
 }
+
+# 最新条目超过这么多天就告警——栏目可能在无声无息地停更
+STALE_DAYS = 90
 
 # 日期格式候选。BBC 页面格式未知，逐个尝试；命中不了的会记进日志供排查。
 DATE_FORMATS = (
@@ -258,13 +262,29 @@ def main() -> int:
                 build_rss(channel, label, items), encoding="utf-8"
             )
             results.append((slug, f"BBC英语学习-{label}", len(items)))
-            log.info("✅ %-24s %d 条", label, len(items))
+            newest = max(i["date"] for i in items)
+            age = (datetime.now(timezone.utc) - newest).days
+            if age > STALE_DAYS:
+                log.warning(
+                    "⚠️  %-24s %d 条，但最新一条已是 %d 天前（%s），栏目可能已停更",
+                    label, len(items), age, newest.strftime("%Y-%m-%d"),
+                )
+            else:
+                log.info("✅ %-24s %d 条，最新 %s", label, len(items),
+                         newest.strftime("%Y-%m-%d"))
         except Exception as exc:  # noqa: BLE001 — 单栏目失败不影响其他栏目
             failed.append(channel)
             log.error("❌ %-24s %s", label, exc)
 
     if results:
         write_index(results)
+
+    # 清掉已从 CHANNELS 移除的栏目残留文件，避免死源继续被订阅
+    keep = {f"{slug}.xml" for slug, _, _ in results}
+    for stale in OUT_DIR.glob("bbc-*.xml"):
+        if stale.name not in keep:
+            stale.unlink()
+            log.info("清理残留: %s", stale.name)
 
     log.info("完成：%d 个栏目成功，%d 个失败", len(results), len(failed))
     if failed:
