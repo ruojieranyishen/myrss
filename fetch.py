@@ -28,6 +28,8 @@ from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 ROOT = "https://www.bbc.co.uk"
 OUT_DIR = Path(__file__).resolve().parent / "docs"
@@ -205,13 +207,24 @@ def build_rss(channel: str, label: str, items: list[dict]) -> str:
     )
 
 
-def write_index(results: list[tuple[str, str, int]]) -> None:
-    """生成一个简单的浏览页，方便在浏览器里直接看有哪些源。"""
-    rows = "\n".join(
-        f'      <li><a href="{slug}.xml">{html.escape(label)}</a> '
-        f'<span class="n">{count} 条</span></li>'
-        for slug, label, count in results
-    )
+def write_index() -> None:
+    """生成浏览页。
+
+    按磁盘上的文件列举，而非本次抓取结果——某栏目本次失败时，
+    上一次的成果仍在，这里也应该显示出来。
+    """
+    entries = []
+    for path in sorted(OUT_DIR.glob("bbc-*.xml")):
+        label = CHANNELS.get(path.stem.removeprefix("bbc-"), path.stem)
+        try:
+            count = len(re.findall(r"<item>", path.read_text(encoding="utf-8")))
+        except OSError:
+            count = 0
+        entries.append(
+            f'      <li><a href="{path.name}">{html.escape(label)}</a> '
+            f'<span class="n">{count} 条</span></li>'
+        )
+    rows = "\n".join(entries)
     (OUT_DIR / "index.html").write_text(
         f"""<!doctype html>
 <html lang="zh-CN"><meta charset="utf-8">
@@ -248,6 +261,18 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     session = requests.Session()
+    # BBC 偶发瞬时 404/5xx（同一 URL 前后两次请求结果可能不同），重试几次再放弃
+    session.mount(
+        "https://",
+        HTTPAdapter(
+            max_retries=Retry(
+                total=3,
+                backoff_factor=1.5,
+                status_forcelist=[404, 429, 500, 502, 503, 504],
+                allowed_methods=["GET"],
+            )
+        ),
+    )
     results: list[tuple[str, str, int]] = []
     failed: list[str] = []
 
@@ -276,11 +301,12 @@ def main() -> int:
             failed.append(channel)
             log.error("❌ %-24s %s", label, exc)
 
-    if results:
-        write_index(results)
+    write_index()
 
-    # 清掉已从 CHANNELS 移除的栏目残留文件，避免死源继续被订阅
-    keep = {f"{slug}.xml" for slug, _, _ in results}
+    # 清掉已从 CHANNELS 移除的栏目残留文件。
+    # 注意这里是按「配置」而非「本次结果」判断——否则某个栏目一次瞬时抓取失败
+    # 就会把上一次的好数据删掉。
+    keep = {f"bbc-{ch}.xml" for ch in CHANNELS}
     for stale in OUT_DIR.glob("bbc-*.xml"):
         if stale.name not in keep:
             stale.unlink()
