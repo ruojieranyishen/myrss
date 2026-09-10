@@ -1,0 +1,67 @@
+# myrss
+
+墙外抓取、墙内订阅的静态 RSS 镜像。
+
+## 为什么需要它
+
+BBC Learning English、VOA 等英语学习源在大陆网络不可达（实测连接超时）。
+GitHub Actions 的 runner 在墙外，可以直连这些站点；抓取结果作为静态 XML
+提交回本仓库后，墙内客户端通过 `raw.githubusercontent.com` 读取——
+实测 0.3 秒，且不依赖任何第三方 RSS 代理实例。
+
+## 使用
+
+订阅地址形如：
+
+```
+https://raw.githubusercontent.com/ruojieranyishen/myrss/main/docs/bbc-take-away-english.xml
+```
+
+全部可用源见 [`docs/index.html`](docs/index.html)。
+
+newsboat 里直接把这行加进 `urls` 文件即可。
+
+## 当前源
+
+| 文件 | 栏目 |
+|------|------|
+| `bbc-take-away-english.xml` | 随身英语 |
+| `bbc-english-in-a-minute.xml` | 一分钟英语 |
+| `bbc-authentic-real-english.xml` | 地道英语 |
+| `bbc-todays-phrase.xml` | 今日短语 |
+| `bbc-english-at-work.xml` | 白领英语 |
+| `bbc-lingohack.xml` | 英语大破解 |
+| `bbc-phrasal-verbs.xml` | 短语动词 |
+| `bbc-q-and-a.xml` | 你问我答 |
+| `bbc-media-english.xml` | 媒体英语 |
+
+内容为中英对照（BBC 中文版），含词汇标注与英文原文。
+
+## 更新机制
+
+`.github/workflows/fetch.yml` 每天 22:23 UTC（北京时间 06:23）运行一次，
+也可在 Actions 页面手动触发。单栏目抓取失败不会中断整体流程，
+已有内容照常发布。
+
+## 本地运行
+
+```bash
+pip install requests beautifulsoup4
+python fetch.py              # 全部栏目
+python fetch.py --channel todays-phrase -v   # 单栏目，带调试日志
+```
+
+注意：BBC 站点在墙内不可达，本地运行会失败，这是预期行为——
+本脚本的设计前提就是在墙外的 GitHub runner 上运行。
+
+## 抓取逻辑来源
+
+BBC Learning English 的页面选择器沿用
+[RSSHub](https://github.com/DIYgod/RSSHub) 的
+`lib/routes/bbc/learningenglish.ts`（已验证有效的实现），
+并修正了其日期解析缺陷。
+
+## 版权
+
+本仓库仅镜像 BBC 公开 RSS 的条目（标题、链接、摘要），供个人学习使用。
+内容版权归 BBC 所有。
