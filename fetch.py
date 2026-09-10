@@ -57,6 +57,10 @@ CHANNELS: dict[str, str] = {
 # 最新条目超过这么多天就告警——栏目可能在无声无息地停更
 STALE_DAYS = 90
 
+# 文章配套音频。BBC 把 mp3 放在 downloads.bbc.co.uk（Akamai CDN），
+# 与 www.bbc.co.uk 一样在墙内可达，可以直接给客户端当 enclosure。
+MP3_RE = re.compile(r'https?://downloads\.bbc\.co\.uk/[^\s"\'<>]+\.mp3')
+
 # 日期格式候选。BBC 页面格式未知，逐个尝试；命中不了的会记进日志供排查。
 DATE_FORMATS = (
     "%d %b %Y", "%d %B %Y", "%d/%m/%Y", "%Y-%m-%d",
@@ -99,16 +103,24 @@ def absolute(href: str | None) -> str | None:
     return href if href.startswith("http") else f"{ROOT}{href}"
 
 
-def fetch_detail_content(session: requests.Session, url: str) -> str:
-    """抓文章详情页正文。失败不影响条目本身，只是 description 为空。"""
+def fetch_detail(session: requests.Session, url: str) -> tuple[str, str | None]:
+    """抓文章详情页，返回 (正文 HTML, 音频 URL)。
+
+    正文取自 .widget-richtext；音频不在这个容器里——BBC 用单独的
+    .widget-audio 渲染播放器，所以要在整页上找 mp3。
+    失败不影响条目本身，只是 description/enclosure 为空。
+    """
     try:
         resp = session.get(url, headers=HEADERS, timeout=TIMEOUT)
         resp.raise_for_status()
         node = BeautifulSoup(resp.text, "html.parser").select_one(".widget-richtext")
-        return node.decode_contents() if node else ""
+        return (
+            node.decode_contents() if node else "",
+            next(iter(MP3_RE.findall(resp.text)), None),
+        )
     except Exception as exc:  # noqa: BLE001 — 单条失败不该拖垮整个源
         log.warning("详情页抓取失败 %s: %s", url, exc)
-        return ""
+        return "", None
 
 
 def scrape_channel(session: requests.Session, channel: str) -> list[dict]:
@@ -153,16 +165,15 @@ def scrape_channel(session: requests.Session, channel: str) -> list[dict]:
             }
         )
 
-    # 并发补详情页正文
+    # 并发补详情页正文与音频
     targets = [i for i in items if i.get("link")]
     if targets:
         with ThreadPoolExecutor(max_workers=6) as pool:
             futures = {
-                pool.submit(fetch_detail_content, session, i["link"]): i
-                for i in targets
+                pool.submit(fetch_detail, session, i["link"]): i for i in targets
             }
             for fut in as_completed(futures):
-                futures[fut]["content"] = fut.result()
+                futures[fut]["content"], futures[fut]["audio"] = fut.result()
 
     if not items:
         # 选择器失效时给出足够线索，免得只能靠猜
@@ -200,6 +211,13 @@ def build_rss(channel: str, label: str, items: list[dict]) -> str:
         ET.SubElement(node, "pubDate").text = format_datetime(it["date"])
         if it.get("content"):
             ET.SubElement(node, "description").text = it["content"]
+        if it.get("audio"):
+            # length 未知。RSS 规范要求该属性存在，填 0 各客户端都能处理。
+            ET.SubElement(
+                node,
+                "enclosure",
+                {"url": it["audio"], "type": "audio/mpeg", "length": "0"},
+            )
 
     ET.indent(rss, space="  ")
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(
@@ -287,16 +305,18 @@ def main() -> int:
                 build_rss(channel, label, items), encoding="utf-8"
             )
             results.append((slug, f"BBC英语学习-{label}", len(items)))
+            # 音频覆盖率一并报出来——BBC 改版把播放器挪走后，这里会先掉下来
+            audio = sum(1 for i in items if i.get("audio"))
             newest = max(i["date"] for i in items)
             age = (datetime.now(timezone.utc) - newest).days
             if age > STALE_DAYS:
                 log.warning(
-                    "⚠️  %-24s %d 条，但最新一条已是 %d 天前（%s），栏目可能已停更",
-                    label, len(items), age, newest.strftime("%Y-%m-%d"),
+                    "⚠️  %-24s %d 条（音频 %d），但最新一条已是 %d 天前（%s），栏目可能已停更",
+                    label, len(items), audio, age, newest.strftime("%Y-%m-%d"),
                 )
             else:
-                log.info("✅ %-24s %d 条，最新 %s", label, len(items),
-                         newest.strftime("%Y-%m-%d"))
+                log.info("✅ %-24s %d 条（音频 %d），最新 %s", label, len(items),
+                         audio, newest.strftime("%Y-%m-%d"))
         except Exception as exc:  # noqa: BLE001 — 单栏目失败不影响其他栏目
             failed.append(channel)
             log.error("❌ %-24s %s", label, exc)
